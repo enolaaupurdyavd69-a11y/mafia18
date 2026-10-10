@@ -2,97 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Мафия 18+</title>
-<style>
-  :root { color-scheme: dark; --bg:#140f1f; --card:#2a1f44; --line:#3a2d5c; --fg:#f3eefc; --muted:#a99cc6; --pink:#ff4fa3; --ok:#3ddc97; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
-  main { max-width: 480px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 14px; }
-  h1 { margin: 8px 0 0; font-size: 30px; } .muted { color: var(--muted); }
-  button { border: 0; border-radius: 16px; padding: 16px; font: 700 16px system-ui; background: var(--pink); color: #fff; }
-  button.ghost { background: var(--card); color: var(--fg); border: 1px solid var(--line); }
-  input { border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 12px; padding: 14px; font: 16px system-ui; }
-  .card { background: var(--card); border-radius: 16px; padding: 14px; border: 1px solid var(--line); }
-  .ok { color: var(--ok); font-weight: 700; }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main id="app"></main>
-<script>
-'use strict';
-// Этап 1: проверка оболочки и связи по Wi-Fi. Полная игра появится на следующих этапах.
-const A = window.Android;
-const app = document.getElementById('app');
-const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let name = localStorage.getItem('name') || '';
-let timer = null;
-
-function stop() { clearInterval(timer); timer = null; if (A) { A.scanStop(); } }
-
-function menu() {
-  stop();
-  app.innerHTML = `<h1>🎭 Мафия 18+</h1><p class="muted">Каждый играет со своего телефона. Все — в одной Wi-Fi.</p>
-    <input id="nm" placeholder="Ваше имя" maxlength="20" value="${esc(name)}">
-    <button id="host">Создать игру</button><button class="ghost" id="find">Найти игру</button>
-    <p class="muted" style="font-size:13px">Версия 0.1 — проверка связи. Разработчик: Ромашко Игорь Николаевич</p>`;
-  const take = () => { name = document.getElementById('nm').value.trim() || 'Игрок'; localStorage.setItem('name', name); };
-  document.getElementById('host').onclick = () => { take(); host(); };
-  document.getElementById('find').onclick = () => { take(); find(); };
-}
-
-function host() {
-  if (!A) { app.innerHTML = '<p>Это работает только в приложении.</p>'; return; }
-  const port = A.hostStart('Мафия · ' + name);
-  A.awake(true);
-  const guests = {};
-  app.innerHTML = `<h1>Игра создана</h1><p class="muted">Адрес: ${esc(A.ip())}:${port}. Пусть второй телефон нажмёт «Найти игру».</p>
-    <div class="card" id="g">Пока никто не подключился</div><button class="ghost" id="back">Назад</button>`;
-  document.getElementById('back').onclick = () => { A.hostStop(); A.awake(false); menu(); };
-  timer = setInterval(() => {
-    for (const r of JSON.parse(A.take())) {
-      let b = {}; try { b = JSON.parse(r.body); } catch { /* */ }
-      guests[b.name || r.ip] = Date.now();
-      A.reply(r.id, JSON.stringify({ ok: true, host: name, guests: Object.keys(guests) }));
-      A.vibrate(60);
-    }
-    const list = Object.keys(guests);
-    if (list.length) document.getElementById('g').innerHTML = '<span class="ok">Подключились:</span> ' + list.map(esc).join(', ');
-  }, 100);
-}
-
-function find() {
-  if (!A) { app.innerHTML = '<p>Это работает только в приложении.</p>'; return; }
-  A.scanStart();
-  app.innerHTML = `<h1>Ищем игры…</h1><p class="muted">Телефоны должны быть в одной Wi-Fi (или в раздаче с телефона хозяина).</p>
-    <div id="list" class="card">Пока ничего не нашли</div><button class="ghost" id="back">Назад</button>`;
-  document.getElementById('back').onclick = menu;
-  timer = setInterval(() => {
-    const games = JSON.parse(A.games());
-    if (!games.length) return;
-    const el = document.getElementById('list');
-    el.innerHTML = games.map((g, i) => `<button data-i="${i}" style="width:100%;margin:4px 0">${esc(g.name)}</button>`).join('');
-    el.onclick = e => { const b = e.target.closest('[data-i]'); if (b) join(games[b.dataset.i]); };
-  }, 700);
-}
-
-async function join(g) {
-  stop();
-  app.innerHTML = `<h1>Подключаемся…</h1><p class="muted">${esc(g.name)}</p>`;
-  try {
-    const r = await fetch(`http://${g.host}:${g.port}/api`, { method: 'POST', body: JSON.stringify({ name }) });
-    const d = await r.json();
-    app.innerHTML = `<h1 class="ok">Связь есть ✅</h1><p>Хозяин: ${esc(d.host)}. В игре: ${d.guests.map(esc).join(', ')}.</p>
-      <button class="ghost" id="back">В меню</button>`;
-    A.vibrate(60);
-  } catch (e) {
-    app.innerHTML = `<h1>Не получилось</h1><p class="muted">${esc(e)}</p><button class="ghost" id="back">В меню</button>`;
-  }
-  document.getElementById('back').onclick = menu;
-}
-
-window.onBack = () => { if (timer || !document.getElementById('host')) { if (A) A.hostStop(); menu(); return true; } return false; };
-menu();
-</script>
+<div id="toast" hidden></div>
+<script src="game.js"></script>
+<script src="ui.js"></script>
 </body>
 </html>

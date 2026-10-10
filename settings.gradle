@@ -1,0 +1,16 @@
+// Google Maven и dl.google.com из этой сети недоступны — берём зеркало Aliyun
+pluginManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        mavenCentral()
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        mavenCentral()
+    }
+}
+rootProject.name = 'mafia18'
+include ':app'
